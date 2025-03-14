@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Light Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #e74c3c;
+            --background-color: #f9f9f9;
+            --container-bg: #ffffff;
+            --text-color: #333333;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            background: var(--container-bg);
+            padding: 2.5rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            font-size: 2rem;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            border-radius: 2px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.85rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #onButton {
+            background-image: linear-gradient(to right, #4CAF50, #45a049);
+        }
+
+        #onButton:hover {
+            background-image: linear-gradient(to right, #45a049, #388e3c);
+        }
+
+        #offButton {
+            background-image: linear-gradient(to right, #e74c3c, #c0392b);
+        }
+
+        #offButton:hover {
+            background-image: linear-gradient(to right, #c0392b, #a52a2a);
+        }
+
+        .status {
+            font-size: 1.2rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .status span {
+            font-weight: bold;
+            color: var(--primary-color);
+            transition: all 0.3s ease;
+        }
+
+        .status.off span {
+            color: var(--secondary-color);
+        }
+
+        .light-indicator {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 1rem auto;
+            background-color: #f1f1f1;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .light-indicator.on {
+            background-color: #ffffa0;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.6);
+        }
+
+        .connection-status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .connection-status.connected {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #2e7d32;
+        }
+
+        .connection-status.disconnected {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #c0392b;
+        }
+
+        .mqtt-broker {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1.5rem;
+                border-radius: 10px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .buttons {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .light-indicator {
+                width: 80px;
+                height: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MQTT Light Control</h1>
+        <div class="light-indicator" id="lightIndicator"></div>
+        <div class="buttons">
+            <button id="onButton">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12"></path>
+                </svg>
+                Turn ON
+            </button>
+            <button id="offButton">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12"></path>
+                </svg>
+                Turn OFF
+            </button>
+        </div>
+        <p class="status" id="status">Status: <span>No command sent yet</span></p>
+        <p class="mqtt-broker">MQTT Broker: <span id="brokerAddress">ws://157.173.101.159:9001/mqtt</span></p>
+        <p class="mqtt-broker">Topic: <span id="topicDisplay">/student_group/light_control</span></p>
+        <div class="connection-status disconnected" id="connectionStatus">Disconnected</div>
+    </div>
+
+    <script>
+        // MQTT Broker details
+        const broker = "ws://157.173.101.159:9001/mqtt"; // WebSocket URL
+        const topic = "/student_group/light_control"; // MQTT topic (use this as required in your assignment)
+        
+        // Update displayed topic
+        document.getElementById("topicDisplay").textContent = topic;
+
+        // Generate a unique client ID to avoid conflicts
+        const clientId = "webClient_" + Math.random().toString(16).substr(2, 8);
+        
+        // Create an MQTT client
+        const client = new Paho.MQTT.Client(broker, clientId);
+
+        // Set connection status indicators
+        const connectionStatus = document.getElementById("connectionStatus");
+        const lightIndicator = document.getElementById("lightIndicator");
+        
+        // Handle MQTT connection
+        client.connect({
+            onSuccess: () => {
+                console.log("Connected to MQTT broker");
+                connectionStatus.textContent = "Connected";
+                connectionStatus.classList.remove("disconnected");
+                connectionStatus.classList.add("connected");
+                client.subscribe(topic);
+            },
+            onFailure: (err) => {
+                console.error("Failed to connect to MQTT broker", err);
+                connectionStatus.textContent = "Connection Failed";
+                connectionStatus.classList.remove("connected");
+                connectionStatus.classList.add("disconnected");
+            }
+        });
+
+        // Handle connection lost
+        client.onConnectionLost = function(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log("Connection lost: " + responseObject.errorMessage);
+                connectionStatus.textContent = "Disconnected";
+                connectionStatus.classList.remove("connected");
+                connectionStatus.classList.add("disconnected");
+                
+                // Try to reconnect after 5 seconds
+                setTimeout(() => {
+                    console.log("Attempting to reconnect...");
+                    client.connect({
+                        onSuccess: () => {
+                            console.log("Reconnected to MQTT broker");
+                            connectionStatus.textContent = "Connected";
+                            connectionStatus.classList.remove("disconnected");
+                            connectionStatus.classList.add("connected");
+                            client.subscribe(topic);
+                        },
+                        onFailure: (err) => {
+                            console.error("Failed to reconnect to MQTT broker", err);
+                        }
+                    });
+                }, 5000);
+            }
+        };
+
+        // Handle incoming messages
+        client.onMessageArrived = function (message) {
+            console.log(`Received message on ${message.destinationName}: ${message.payloadString}`);
+            const statusElement = document.getElementById("status");
+            statusElement.innerHTML = `Status: <span>${message.payloadString}</span>`;
+            
+            // Toggle class based on message
+            if (message.payloadString === "ON") {
+                statusElement.classList.remove("off");
+                lightIndicator.classList.add("on");
+            } else if (message.payloadString === "OFF") {
+                statusElement.classList.add("off");
+                lightIndicator.classList.remove("on");
+            }
+        };
+
+        // Function to publish a message
+        function publishMessage(message) {
+            if (client.isConnected()) {
+                const packet = new Paho.MQTT.Message(message);
+                packet.destinationName = topic;
+                client.send(packet);
+
+                // Update UI
+                console.log(`Published: ${message}`);
+                const statusElement = document.getElementById("status");
+                statusElement.innerHTML = `Status: <span>${message}</span>`;
+                
+                // Toggle class based on message
+                if (message === "ON") {
+                    statusElement.classList.remove("off");
+                    lightIndicator.classList.add("on");
+                } else if (message === "OFF") {
+                    statusElement.classList.add("off");
+                    lightIndicator.classList.remove("on");
+                }
+            } else {
+                console.error("MQTT Client is not connected.");
+                alert("Not connected to MQTT broker. Please check your connection.");
+            }
+        }
+
+        // Button event listeners
+        document.getElementById("onButton").addEventListener("click", () => publishMessage("ON"));
+        document.getElementById("offButton").addEventListener("click", () => publishMessage("OFF"));
+    </script>
+</body>
+</html>
